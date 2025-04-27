@@ -16,7 +16,7 @@ services:
         value: ${POSTGRES_DB:-leadscrm}
     ports:
       - port: 5432
-        published: 5432
+        published: ${POSTGRES_PORT:-5432}
     volumes:
       - path: /var/lib/postgresql/data
         name: postgres_data
