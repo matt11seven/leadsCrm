@@ -15,9 +15,8 @@ RUN mkdir -p /docker-entrypoint-initdb.d
 COPY ./init/*.sql /docker-entrypoint-initdb.d/
 
 # Environment variables are set through the Easypanel interface
-ENV POSTGRES_PASSWORD=postgres
-ENV POSTGRES_USER=postgres
-ENV POSTGRES_DB=leadscrm
+# Não definimos as variáveis aqui para evitar o hardcoding de credenciais
+# Os valores serão injetados pelo Easypanel através das variáveis de ambiente
 
 # Set up for pgcrypto, pg_stat_statements, pg_cron
 RUN echo "shared_preload_libraries = 'pg_stat_statements,pg_cron'" >> /usr/local/share/postgresql/postgresql.conf.sample
