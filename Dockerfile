@@ -54,9 +54,9 @@ WORKDIR /opt/listener
 RUN npm install --production
 WORKDIR /
 
-# Copiar e configurar script de entrypoint customizado
-COPY docker-entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+# Scripts de inicialização e configuração
+COPY start-on-postgres.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/start-on-postgres.sh
 
 # Expor a porta do PostgreSQL
 EXPOSE 5432
@@ -65,5 +65,5 @@ EXPOSE 5432
 VOLUME ["/var/lib/postgresql/data"]
 
 # Entrypoint e comando
-ENTRYPOINT ["docker-entrypoint.sh"]
+ENTRYPOINT ["start-on-postgres.sh"]
 CMD ["postgres"]
