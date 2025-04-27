@@ -1,52 +1,32 @@
-FROM postgres:17-alpine
+FROM postgres:17
 
-# Add PostgreSQL extensions and utilities
-RUN apk add --no-cache \
-    build-base \
-    postgresql-dev \
-    git \
-    curl \
+# Instalar extensões e utilitários do PostgreSQL
+RUN apt-get update && apt-get install -y \
+    postgresql-contrib \
+    postgresql-17-cron \
     ca-certificates \
     tzdata \
-    wget
+    && rm -rf /var/lib/apt/lists/*
 
-# Install pg_cron extension (usando uma abordagem alternativa)
-RUN cd /tmp && \
-    git clone https://github.com/citusdata/pg_cron.git && \
-    cd pg_cron && \
-    # Desativar a compilação com clang que está causando problemas
-    sed -i 's/clang/gcc/g' Makefile && \
-    sed -i '/llvm/d' Makefile && \
-    # Compilar apenas o básico necessário
-    make NO_PGXS=1 && \
-    cp pg_cron.so /usr/local/lib/postgresql/ && \
-    cp pg_cron.control /usr/local/share/postgresql/extension/ && \
-    cp pg_cron--*.sql /usr/local/share/postgresql/extension/
-
-# Install PostgreSQL extensions
+# Criar diretório para scripts de inicialização
 RUN mkdir -p /docker-entrypoint-initdb.d
 
-# Copy initialization scripts
+# Copiar scripts de inicialização
 COPY ./init/*.sql /docker-entrypoint-initdb.d/
 
-# Environment variables are set through the Easypanel interface
-# Não definimos as variáveis aqui para evitar o hardcoding de credenciais
-# Os valores serão injetados pelo Easypanel através das variáveis de ambiente
+# Configurar bibliotecas compartilhadas
+RUN echo "shared_preload_libraries = 'pg_stat_statements,pg_cron'" >> /usr/share/postgresql/postgresql.conf.sample
+RUN echo "cron.database_name = '${POSTGRES_DB:-leadscrm}'" >> /usr/share/postgresql/postgresql.conf.sample
 
-# Set up for pgcrypto, pg_stat_statements
-RUN echo "shared_preload_libraries = 'pg_stat_statements'" >> /usr/local/share/postgresql/postgresql.conf.sample
+# Criar script de inicialização para garantir que as extensões sejam criadas
+RUN echo '#!/bin/bash\necho "Habilitando extensões necessárias..."\npsql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "CREATE EXTENSION IF NOT EXISTS pgcrypto;"\npsql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "CREATE EXTENSION IF NOT EXISTS pg_stat_statements;"\npsql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "CREATE EXTENSION IF NOT EXISTS pg_cron;"' > /docker-entrypoint-initdb.d/00-create-extensions.sh \
+    && chmod +x /docker-entrypoint-initdb.d/00-create-extensions.sh
 
-# A extensão pg_cron será instalada diretamente no script SQL de inicialização
-# em vez de ser carregada como shared_preload_library
-
-# Expose the PostgreSQL port
+# Expor a porta do PostgreSQL
 EXPOSE 5432
 
-# Volume to persist data
+# Volume para persistir dados
 VOLUME ["/var/lib/postgresql/data"]
 
-# Set the working directory
-WORKDIR /var/lib/postgresql
-
-# Default command
+# Comando padrão
 CMD ["postgres"]
