@@ -22,7 +22,8 @@ function buildWebhookUrl() {
   const primaryDomain = process.env.PRIMARY_DOMAIN || 'localhost';
   const webhookPath = process.env.WEBHOOK_PATH || '/lead-events';
   
-  // Formatar a URL completa
+  // Formatar a URL completa usando a notação $(VARIABLE_NAME) do Easypanel
+  // Para o código JavaScript, usamos interpolation com $ mas mantemos os nomes de variáveis
   return `https://${projectName}-${serviceName}.${primaryDomain}${webhookPath}`;
 }
 
