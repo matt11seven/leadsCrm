@@ -1,75 +1,60 @@
 #!/bin/bash
 set -e
 
-# Iniciar o listener Node.js após o PostgreSQL estar pronto
+# Diretório para sinalizar quando o listener já está em execução
+LISTENER_FLAG="/tmp/.listener_running"
+
+# Função para iniciar o listener Node.js em um processo separado
 start_listener() {
-    echo "Iniciando o listener Node.js para eventos do PostgreSQL..."
-    cd /opt/listener && node listener.js
+    if [ ! -f "$LISTENER_FLAG" ]; then
+        echo "Iniciando o listener Node.js para eventos do PostgreSQL..."
+        cd /opt/listener && node listener.js &
+        # Criar sinalizador para que não iniciemos o listener repetidamente
+        touch "$LISTENER_FLAG"
+    else
+        echo "Listener Node.js já está em execução."
+    fi
 }
 
-# Configurar o PostgreSQL após inicialização
-setup_postgres() {
-    echo "PostgreSQL iniciado. Configurando extensões..."
+# Este script será executado após o PostgreSQL já estar em execução
+conf_and_start_listener() {
+    # Configurar as extensões e ajustes de acesso
+    echo "Configurando extensões e acesso remoto..."
+    # Esperar o PostgreSQL estar realmente pronto
+    sleep 5
+    
+    # Extensões
     psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "CREATE EXTENSION IF NOT EXISTS pgcrypto;"
     psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "CREATE EXTENSION IF NOT EXISTS pg_stat_statements;"
     psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "CREATE EXTENSION IF NOT EXISTS pg_cron;"
     psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "ALTER DATABASE \"$POSTGRES_DB\" SET timezone TO 'America/Recife';"
     
-    echo "Permitindo conexões de hosts remotos com senha..."
-    echo "host all all 0.0.0.0/0 md5" >> /var/lib/postgresql/data/pg_hba.conf
-    echo "host all all ::/0 md5" >> /var/lib/postgresql/data/pg_hba.conf
+    # Configurar acesso remoto se ainda não estiver configurado
+    if ! grep -q "0.0.0.0/0 md5" "$PGDATA/pg_hba.conf"; then
+        echo "Configurando acesso remoto..."
+        echo "host all all 0.0.0.0/0 md5" >> "$PGDATA/pg_hba.conf"
+        echo "host all all ::/0 md5" >> "$PGDATA/pg_hba.conf"
+        
+        # Recarregar configurações
+        echo "Recarregando configurações do PostgreSQL..."
+        pg_ctl -D "$PGDATA" reload
+    fi
     
-    # Recarregar configurações sem reiniciar o PostgreSQL
-    echo "Recarregando configurações do PostgreSQL..."
-    pg_ctl -D "$PGDATA" reload
-    
-    # Iniciar o listener em background
-    start_listener &
+    # Iniciar o listener
+    start_listener
 }
 
-# Verificar se é o comando postgres
+# Apenas usar o entrypoint original do PostgreSQL
 if [ "$1" = 'postgres' ]; then
-    # Usar o entrypoint original do PostgreSQL para iniciar o servidor
-    # mas modificar para executar nossas funções após inicialização
+    echo "Iniciando PostgreSQL com entrypoint padrão..."
     
-    # Primeiro substituir o entrypoint original
-    ORIGINAL_ENTRYPOINT=$(which docker-entrypoint.sh)
+    # Iniciar o processo de configuração e o listener em background
+    # mas aguardar um pouco para dar tempo ao PostgreSQL iniciar primeiro
+    (sleep 10 && conf_and_start_listener) &
     
-    # Diferenciar entre primeira inicialização e execução normal
-    if [ -f "$PGDATA/PG_VERSION" ]; then
-        echo "PostgreSQL já inicializado, iniciando normalmente..."
-        # Servidor já inicializado, iniciar o PostgreSQL
-        exec "$ORIGINAL_ENTRYPOINT" "$@" & 
-        # Aguardar o PostgreSQL iniciar
-        until pg_isready -h localhost -p 5432; do
-            echo "Aguardando PostgreSQL ficar pronto..."
-            sleep 1
-        done
-        # Iniciar o listener
-        start_listener
-    else
-        echo "Primeira inicialização do PostgreSQL..."
-        # Executar o entrypoint original e esperar inicialização completa
-        "$ORIGINAL_ENTRYPOINT" "$@" & 
-        PG_PID=$!
-        
-        # Aguardar o PostgreSQL iniciar
-        until pg_isready -h localhost -p 5432; do
-            echo "Aguardando PostgreSQL inicializar pela primeira vez..."
-            sleep 2
-            # Verificar se o processo do PostgreSQL ainda está em execução
-            if ! kill -0 $PG_PID 2>/dev/null; then
-                echo "Erro: O processo do PostgreSQL falhou ao iniciar"
-                exit 1
-            fi
-        done
-        
-        # Configurar PostgreSQL
-        setup_postgres
-        
-        # Manter o container vivo
-        wait $PG_PID
-    fi
+    # Excutar o entrypoint original do PostgreSQL
+    ORIGINAL_PATH=$(dirname "$(which docker-entrypoint.sh)")
+    PATH="$ORIGINAL_PATH:$PATH" exec /usr/local/bin/docker-entrypoint.sh "$@"
 else
     # Se não for o comando postgres, executar normalmente
     exec "$@"
