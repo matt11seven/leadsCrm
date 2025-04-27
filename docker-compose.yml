@@ -1,4 +1,4 @@
-version: "3.8"
+# version removida - obsoleta no formato mais recente
 
 services:
   db:
@@ -32,8 +32,7 @@ services:
       # Usa as mesmas variáveis do serviço db
       - DATABASE_URL=postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-leadscrm}
       # Combina variáveis do Easypanel
-      - WEBHOOK_URL=${WEBHOOK_URL:-${EASYPANEL_PROJECT_URL}/api/lead-event}
-      - EASYPANEL_PROJECT_URL=${EASYPANEL_PROJECT_URL}
+      - WEBHOOK_URL=${WEBHOOK_URL:-http://localhost:3000/api/lead-event}
     depends_on:
       db:
         condition: service_healthy
