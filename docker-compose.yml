@@ -6,10 +6,10 @@ services:
     container_name: crm-db
     restart: unless-stopped
     environment:
-      # Valores fixos que podem ser sobrescritos por variáveis de ambiente
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=leadscrm
+      # Leitura de variáveis de ambiente definidas no Easypanel
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=${POSTGRES_DB:-leadscrm}
     volumes:
       - db-data:/var/lib/postgresql/data
       - ./init/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
@@ -26,10 +26,10 @@ services:
     container_name: crm-webhook
     restart: unless-stopped
     environment:
-      # Valores fixos com conexão direta ao banco
-      - DATABASE_URL=postgres://postgres:postgres@db:5432/leadscrm
-      # Usando diretamente a variável que o Easypanel fornece
-      - WEBHOOK_URL=${EASYPANEL_PROJECT_URL}/api/lead-event
+      # Usa as mesmas variáveis do serviço db
+      - DATABASE_URL=postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-leadscrm}
+      # Combina variáveis do Easypanel
+      - WEBHOOK_URL=${WEBHOOK_URL:-${EASYPANEL_PROJECT_URL}/api/lead-event}
       - EASYPANEL_PROJECT_URL=${EASYPANEL_PROJECT_URL}
     depends_on:
       db:
