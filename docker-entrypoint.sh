@@ -43,9 +43,9 @@ EOF
         chmod +x /docker-entrypoint-initdb.d/extensions.sh
     fi
     
-    # Usar entrypoint original do PostgreSQL para fazer a inicialização padrão
-    echo "Iniciando PostgreSQL..."
-    /usr/local/bin/postgres "$@" &
+    # Iniciar o PostgreSQL usando o entrypoint original
+    echo "Iniciando PostgreSQL via entrypoint original..."
+    docker-entrypoint.sh postgres "$@" &
     PG_PID=$!
     
     # Aguardar PostgreSQL iniciar completamente
