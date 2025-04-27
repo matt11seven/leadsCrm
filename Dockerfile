@@ -51,7 +51,7 @@ RUN echo '#!/bin/bash\necho "Habilitando extensões necessárias..."\npsql -U "$
 RUN mkdir -p /opt/listener
 COPY listener/package.json listener/listener.js /opt/listener/
 WORKDIR /opt/listener
-RUN npm ci --omit=dev
+RUN npm install --production
 WORKDIR /
 
 # Copiar e configurar script de entrypoint customizado
