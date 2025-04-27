@@ -3,7 +3,7 @@ version: "1.0"
 services:
   postgresql:
     type: app
-    image: ${IMAGE:-postgres:17-alpine}
+    image: ${IMAGE:-postgres:17}
     build:
       context: .
       dockerfile: Dockerfile
