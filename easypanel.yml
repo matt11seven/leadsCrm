@@ -1,0 +1,32 @@
+version: "1.0"
+
+services:
+  postgresql:
+    type: app
+    image: ${IMAGE:-postgres:17-alpine}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env:
+      - name: POSTGRES_USER
+        value: ${POSTGRES_USER:-postgres}
+      - name: POSTGRES_PASSWORD
+        value: ${POSTGRES_PASSWORD:-postgres}
+      - name: POSTGRES_DB
+        value: ${POSTGRES_DB:-leadscrm}
+    ports:
+      - port: 5432
+        published: 5432
+    volumes:
+      - path: /var/lib/postgresql/data
+        name: postgres_data
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+    name: leadscrm_postgres_data

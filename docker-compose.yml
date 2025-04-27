@@ -1,41 +1,24 @@
-# version removida - obsoleta no formato mais recente
+version: '3.8'
 
 services:
-  db:
-    image: postgres:17
-    container_name: crm-db
-    restart: unless-stopped
+  postgres:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
     environment:
-      # Leitura de variáveis de ambiente definidas no Easypanel
-      - POSTGRES_USER=${POSTGRES_USER:-postgres}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
-      - POSTGRES_DB=${POSTGRES_DB:-leadscrm}
-    volumes:
-      - db-data:/var/lib/postgresql/data
-      - ./init/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-leadscrm}
     ports:
       - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d leadscrm"]
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
       timeout: 5s
       retries: 5
-      
-  webhook:
-    image: node:18-alpine
-    container_name: crm-webhook
-    working_dir: /app/webhook
-    volumes:
-      - ./webhook:/app/webhook
-    restart: unless-stopped
-    environment:
-      # Usa as mesmas variáveis do serviço db
-      - DATABASE_URL=postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-leadscrm}
-      # Combina variáveis do Easypanel
-      - WEBHOOK_URL=${WEBHOOK_URL:-http://localhost:3000/api/lead-event}
-    depends_on:
-      db:
-        condition: service_healthy
 
 volumes:
-  db-data:
+  postgres_data:
