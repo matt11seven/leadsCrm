@@ -1,60 +1,48 @@
 #!/bin/bash
 set -e
 
-# Diretório para sinalizar quando o listener já está em execução
-LISTENER_FLAG="/tmp/.listener_running"
+# Este é um script simplificado para evitar quaisquer problemas de inicialização
 
-# Função para iniciar o listener Node.js em um processo separado
-start_listener() {
-    if [ ! -f "$LISTENER_FLAG" ]; then
-        echo "Iniciando o listener Node.js para eventos do PostgreSQL..."
-        cd /opt/listener && node listener.js &
-        # Criar sinalizador para que não iniciemos o listener repetidamente
-        touch "$LISTENER_FLAG"
-    else
-        echo "Listener Node.js já está em execução."
-    fi
-}
-
-# Este script será executado após o PostgreSQL já estar em execução
-conf_and_start_listener() {
-    # Configurar as extensões e ajustes de acesso
-    echo "Configurando extensões e acesso remoto..."
-    # Esperar o PostgreSQL estar realmente pronto
-    sleep 5
-    
-    # Extensões
-    psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "CREATE EXTENSION IF NOT EXISTS pgcrypto;"
-    psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "CREATE EXTENSION IF NOT EXISTS pg_stat_statements;"
-    psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "CREATE EXTENSION IF NOT EXISTS pg_cron;"
-    psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "ALTER DATABASE \"$POSTGRES_DB\" SET timezone TO 'America/Recife';"
-    
-    # Configurar acesso remoto se ainda não estiver configurado
-    if ! grep -q "0.0.0.0/0 md5" "$PGDATA/pg_hba.conf"; then
-        echo "Configurando acesso remoto..."
-        echo "host all all 0.0.0.0/0 md5" >> "$PGDATA/pg_hba.conf"
-        echo "host all all ::/0 md5" >> "$PGDATA/pg_hba.conf"
-        
-        # Recarregar configurações
-        echo "Recarregando configurações do PostgreSQL..."
-        pg_ctl -D "$PGDATA" reload
-    fi
-    
-    # Iniciar o listener
-    start_listener
-}
-
-# Apenas usar o entrypoint original do PostgreSQL
+# Se for o comando postgres, simplesmente executar o entrypoint original
 if [ "$1" = 'postgres' ]; then
-    echo "Iniciando PostgreSQL com entrypoint padrão..."
+    # Primeiro, iniciar o PostgreSQL normalmente
+    echo "Iniciando PostgreSQL (usando script padrão)..."
     
-    # Iniciar o processo de configuração e o listener em background
-    # mas aguardar um pouco para dar tempo ao PostgreSQL iniciar primeiro
-    (sleep 10 && conf_and_start_listener) &
+    # Iniciar uma tarefa em background para configurar as extensões e iniciar o listener depois
+    (
+        # Aguardar tempo suficiente para o PostgreSQL inicializar completamente
+        echo "Agendando início do listener para daqui a 30 segundos..."
+        sleep 30
+        
+        # Tentar conectar ao PostgreSQL para verificar se está funcionando
+        echo "Verificando conexão com PostgreSQL..."
+        if PGPASSWORD="$POSTGRES_PASSWORD" psql -h localhost -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT 1;" > /dev/null 2>&1; then
+            echo "PostgreSQL está respondendo. Configurando extensões..."
+            
+            # Criar extensões
+            PGPASSWORD="$POSTGRES_PASSWORD" psql -h localhost -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "CREATE EXTENSION IF NOT EXISTS pgcrypto;"
+            PGPASSWORD="$POSTGRES_PASSWORD" psql -h localhost -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "CREATE EXTENSION IF NOT EXISTS pg_stat_statements;"
+            PGPASSWORD="$POSTGRES_PASSWORD" psql -h localhost -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "CREATE EXTENSION IF NOT EXISTS pg_cron;"
+            PGPASSWORD="$POSTGRES_PASSWORD" psql -h localhost -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "ALTER DATABASE \"$POSTGRES_DB\" SET timezone TO 'America/Recife';"
+            
+            # Adicionar configuração para acesso remoto
+            echo "Configurando acesso remoto..."
+            echo "host all all 0.0.0.0/0 md5" >> "$PGDATA/pg_hba.conf"
+            echo "host all all ::/0 md5" >> "$PGDATA/pg_hba.conf"
+            
+            # Recarregar configurações
+            pg_ctl -D "$PGDATA" reload
+            
+            # Iniciar o listener Node.js
+            echo "Iniciando o listener Node.js para eventos do PostgreSQL..."
+            cd /opt/listener && exec node listener.js &
+        else
+            echo "ERRO: Não foi possível conectar ao PostgreSQL após 30 segundos."
+        fi
+    ) &
     
-    # Excutar o entrypoint original do PostgreSQL
-    ORIGINAL_PATH=$(dirname "$(which docker-entrypoint.sh)")
-    PATH="$ORIGINAL_PATH:$PATH" exec /usr/local/bin/docker-entrypoint.sh "$@"
+    # Executar o entrypoint original do PostgreSQL (sem chamar nosso script novamente)
+    exec /usr/lib/postgresql/17/bin/postgres -D "$PGDATA"
 else
     # Se não for o comando postgres, executar normalmente
     exec "$@"
