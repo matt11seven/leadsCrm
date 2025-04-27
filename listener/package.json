@@ -1,0 +1,17 @@
+{
+  "name": "postgres-webhook-listener",
+  "version": "1.0.0",
+  "description": "Listener para eventos do PostgreSQL com webhook HTTP",
+  "main": "listener.js",
+  "scripts": {
+    "start": "node listener.js"
+  },
+  "dependencies": {
+    "pg": "^8.11.0",
+    "axios": "^1.4.0",
+    "dotenv": "^16.0.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
