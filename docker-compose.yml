@@ -5,17 +5,16 @@ services:
     image: postgres:17
     container_name: crm-db
     restart: unless-stopped
-    env_file:
-      - .env
+    # Configurações diretas em vez de env_file
     environment:
-      - POSTGRES_USER=${POSTGRES_USER:-postgres}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
-      - POSTGRES_DB=${POSTGRES_DB:-leadscrm}
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=leadscrm
     volumes:
       - db-data:/var/lib/postgresql/data
       - ./init/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d leadscrm"]
       interval: 10s
@@ -26,11 +25,10 @@ services:
     build: ./webhook
     container_name: crm-webhook
     restart: unless-stopped
-    env_file:
-      - .env
+    # Configurações diretas em vez de env_file
     environment:
-      - DATABASE_URL=postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-leadscrm}
-      - WEBHOOK_URL=${WEBHOOK_URL:-${EASYPANEL_PROJECT_URL}/api/lead-event}
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/leadscrm
+      - WEBHOOK_URL=${EASYPANEL_PROJECT_URL}/api/lead-event
       - EASYPANEL_PROJECT_URL=${EASYPANEL_PROJECT_URL}
     depends_on:
       db:
